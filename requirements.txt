@@ -2,3 +2,7 @@ streamlit
 yfinance
 plotly
 openpyxl
+pandas-ta
+requests
+beautifulsoup4
+lxml
