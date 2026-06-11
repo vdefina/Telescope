@@ -137,39 +137,57 @@ def ottieni_date_rimbalzo(df, start_date, end_date, cooling_off=10):
 
 # #Analisi valore giorni ottimali
 
-def trova_giorni_ottimali(df, elenco_date, range_test=(1, 60)):
-    #print(f"\n--- Analisi Ottimizzazione: Rischio e Rendimento ---")
+def trova_giorni_ottimali(df, elenco_date, range_test=(3, 45)):
+    """
+    Testa i giorni di holding e trova quello con la performance media migliore.
+    Previene il ZeroDivisionError se l'elenco dei rendimenti è vuoto.
+    """
+    # 1. Protezione iniziale: se non ci sono proprio segnali in partenza
+    if not elenco_date or len(elenco_date) == 0:
+        return 0, 0.0
 
-    # Dizionario per memorizzare: media, min e max
-    report = []
+    miglior_giorno = 0
+    miglior_performance = -999.0
+    elenco_date = pd.to_datetime(elenco_date)
 
-    for g in range(range_test[0], range_test[1] + 1):
+    for giorni in range(range_test[0], range_test[1] + 1):
         rendimenti = []
-        for data in elenco_date:
-            rend = analizza_performance_segnale(df, data, giorni_holding=g)
-            rendimenti.append(rend)
+        
+        for data_segnale in elenco_date:
+            try:
+                if data_segnale in df.index:
+                    # Trova la posizione numerica della riga della data
+                    idx_inizio = df.index.get_loc(data_segnale)
+                    idx_fine = idx_inizio + giorni
+                    
+                    # Verifica che ci siano abbastanza giorni nel futuro per chiudere il trade
+                    if idx_fine < len(df):
+                        prezzo_ingresso = df['Close'].iloc[idx_inizio]
+                        prezzo_uscita = df['Close'].iloc[idx_fine]
+                        
+                        # Gestione robusta per evitare formati strani o valori nulli
+                        if pd.notna(prezzo_ingresso) and pd.notna(prezzo_uscita) and prezzo_ingresso > 0:
+                            rendimento = ((prezzo_uscita - prezzo_ingresso) / prezzo_ingresso) * 100
+                            rendimenti.append(float(rendimento))
+            except Exception:
+                continue # Salta silenziosamente eventuali anomalie su singole date
+        
+        # 🚨 LA MODIFICA CRUCIALE (Risolve il ZeroDivisionError):
+        # Calcoliamo la media SOLO se abbiamo registrato almeno un trade valido completato
+        if len(rendimenti) > 0:
+            media = sum(rendimenti) / len(rendimenti)
+            if media > miglior_performance:
+                miglior_performance = media
+                miglior_giorno = giorni
+        else:
+            # Se per questo specifico numero di giorni non ci sono trade completabili, salta al prossimo
+            continue
 
-        media = sum(rendimenti) / len(rendimenti)
-        minimo = min(rendimenti)
-        massimo = max(rendimenti)
+    # Se alla fine del ciclo non è stato possibile completare nessun trade in nessun giorno
+    if miglior_giorno == 0 or miglior_performance == -999.0:
+        return 0, 0.0
 
-        report.append({
-            "giorni": g,
-            "media": media,
-            "min": minimo,
-            "max": massimo
-        })
-
-    # Convertiamo in un DataFrame per una consultazione facile
-    df_report = pd.DataFrame(report)
-
-    # Troviamo il migliore basato sulla media
-    migliore = df_report.loc[df_report['media'].idxmax()]
-
-    #print(f">>> RISULTATO: Il miglior periodo è {int(migliore['giorni'])} giorni.")
-   # print(f"Media: {migliore['media']:.2f}% | Peggior trade: {migliore['min']:.2f}% | Miglior trade: {migliore['max']:.2f}%")
-
-    return df_report
+    return miglior_giorno, miglior_performance
 
 def verifica_segnale_data(ticker, data_target):
   """
@@ -440,45 +458,3 @@ def individua_top_losers(lista_ticker, lookback_giorni=10, quantita=10):
     classifica = classifica.dropna()
 
     return classifica.head(quantita).index.tolist()
-# --- 4. FUNZIONE PERFORMANCE ---
-def analizza_performance_segnale(df, data_segnale, giorni_holding=30):
-    target_dt = pd.to_datetime(data_segnale)
-    idx_pos = df.index.get_indexer([target_dt], method='nearest')[0]
-
-    prezzo_entrata = df.iloc[idx_pos]['Close']
-    if idx_pos + giorni_holding < len(df):
-        prezzo_uscita = df.iloc[idx_pos + giorni_holding]['Close']
-    else:
-        prezzo_uscita = df.iloc[-1]['Close']
-
-    return ((prezzo_uscita - prezzo_entrata) / prezzo_entrata) * 100
-
-# esegue backtest su un periodo selezionato
-def calcola_backtest(ticker, start_date, end_date, giorni_holding=5):
-    # 1. Download e Preparazione
-    df = yf.download(ticker, start=start_date, end=end_date, auto_adjust=True, progress=False)
-    if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
-
-    # 2. Indicatori
-    bb = ta.bbands(df['Close'], length=20, std=2)
-    df = pd.concat([df, bb], axis=1)
-    df['RSI'] = ta.rsi(df['Close'], length=14)
-    bb_lower = [c for c in df.columns if 'BBL' in c][0]
-
-    # 3. Ciclo di Backtest
-    profitti = []
-    print(f"\n--- Backtest: {ticker} (Holding: {giorni_holding}gg) ---")
-
-    for i in range(20, len(df) - giorni_holding):
-        if df.iloc[i]['Close'] < df.iloc[i][bb_lower] and df.iloc[i]['RSI'] < 35:
-            # --- RICHIAMO LA FUNZIONE SPECIALIZZATA ---
-            rendimento = analizza_performance_segnale(df, i, giorni_holding)
-            profitti.append(rendimento)
-
-            data = df.index[i].strftime('%Y-%m-%d')
-            print(f"Data: {data} | Rendimento: {rendimento:+.2f}%")
-
-    if profitti:
-        print(f"\n>>> RISULTATO: Media su {len(profitti)} trade: {sum(profitti)/len(profitti):.2f}%")
-    else:
-        print("Nessun segnale trovato.")
