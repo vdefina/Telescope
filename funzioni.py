@@ -239,6 +239,146 @@ def verifica_segnale_data(ticker, data_target):
 
   return segnale_attivo
 
+#Analisi trend rialzista
+def is_trend_rialzista(df, i):
+  """
+  Ritorna True se il titolo soddisfa i criteri quantitativi
+  di un forte trend rialzista alla riga 'i'.
+  """
+  # Prendi i valori alla riga corrente
+  prezzo_chiusura = df.iloc[i]['Close']
+  sma_50 = df.iloc[i]['SMA_50']
+  sma_200 = df.iloc[i]['SMA_200']
+
+  # Assicurati di aver calcolato ADX, +DI e -DI nel tuo df
+  adx = df.iloc[i]['ADX']
+  piu_di = df.iloc[i]['PLUS_DI']
+  meno_di = df.iloc[i]['MINUS_DI']
+
+  # CONDIZIONI DEL TREND RIALZISTA:
+  # 1. Il prezzo è sopra entrambe le medie
+  condizione_medie = prezzo_chiusura > sma_50 > sma_200
+
+  # 2. Esiste un trend forte (ADX > 25) e i compratori dominano (+DI > -DI)
+  condizione_forza = (adx > 25) and (piu_di > meno_di)
+
+  # Se entrambe sono vere, il titolo è in un trend rialzista perfetto
+  if condizione_medie and condizione_forza:
+      return True
+  return False
+
+
+  #Analisi golden cross
+
+def analizza_stato_golden_cross(df):
+  """
+  Verifica da quanti giorni di borsa si è verificato l'ultimo Golden Cross
+  e se è tuttora attivo.
+
+  Ritorna una tupla: (giorni_passati, is_attivo_oggi)
+  Se non viene trovato alcun incrocio, ritorna (-1, False)
+  """
+  # 1. Calcola le medie mobili se non sono già presenti nel DataFrame
+  if 'SMA_50' not in df.columns:
+      df['SMA_50'] = df['Close'].rolling(window=50).mean()
+  if 'SMA_200' not in df.columns:
+      df['SMA_200'] = df['Close'].rolling(window=200).mean()
+
+  # Rimuoviamo le righe iniziali con i NaN per evitare errori di calcolo
+  df_pulito = df.dropna(subset=['SMA_50', 'SMA_200'])
+  tot_righe = len(df_pulito)
+
+  if tot_righe < 2:
+      return -1, False  # Non abbastanza dati per analizzare un incrocio
+
+  # Verifica lo stato attuale all'ultima riga (oggi)
+  stato_attuale_sopra = df_pulito['SMA_50'].iloc[-1] > df_pulito['SMA_200'].iloc[-1]
+
+  # 2. Scorriamo il DataFrame al contrario (dall'ultima riga verso il passato)
+  # Partiamo dalla penultima riga (tot_righe - 1) fino alla seconda riga (indice 1)
+  for i in range(tot_righe - 1, 0, -1):
+
+      # Condizione di INCROCIO RIALZISTA (Golden Cross):
+      # Alla riga 'i' la 50 è SOPRA la 200, ma alla riga precedente 'i-1' era SOTTO o UGUALE
+      oggi_sopra = df_pulito['SMA_50'].iloc[i] > df_pulito['SMA_200'].iloc[i]
+      ieri_sotto = df_pulito['SMA_50'].iloc[i-1] <= df_pulito['SMA_200'].iloc[i-1]
+
+      if oggi_sopra and ieri_sotto:
+          # Abbiamo trovato il Golden Cross più recente!
+          # Calcoliamo la distanza in righe (giorni di borsa) tra quel giorno e l'ultimo giorno disponibile
+          giorni_passati = (tot_righe - 1) - i
+
+          return giorni_passati, stato_attuale_sopra
+
+  # Se il ciclo finisce senza trovare incroci
+  return -1, False
+
+
+def screener_golden_cross_recente(lista_ticker, entro_giorni=3):
+  """
+  Scansiona una lista di titoli e restituisce quelli che hanno avuto
+  un Golden Cross (SMA 50 > SMA 200) negli ultimi X giorni.
+  """
+  risultati = []
+  totale = len(lista_ticker)
+
+  print(f"Inizio scansione Golden Cross su {totale} titoli (Finestra: {entro_giorni} gg)...")
+
+  # Dividiamo in blocchi da 50 per evitare blocchi da Yahoo Finance
+  dimensione_blocco = 50
+  blocchi = [lista_ticker[i:i + dimensione_blocco] for i in range(0, totale, dimensione_blocco)]
+
+  for idx_b, blocco in enumerate(blocchi):
+      sys.stdout.write(f"\rAnalisi blocco {idx_b+1}/{len(blocchi)}... ")
+      sys.stdout.flush()
+
+      try:
+          # Scarichiamo lo storico necessario (almeno 300 giorni per avere una SMA 200 stabile)
+          dati = yf.download(blocco, period="2y", progress=False, group_by='ticker')
+
+          for ticker in blocco:
+              # Gestione scaricamento singolo o multi-ticker
+              if ticker not in dati.columns.levels[0]: continue
+              df_tick = dati[ticker].dropna()
+
+              if len(df_tick) < 200: continue
+
+              # Calcolo Medie
+              sma50 = df_tick['Close'].rolling(window=50).mean()
+              sma200 = df_tick['Close'].rolling(window=200).mean()
+
+              # Verifichiamo gli ultimi X giorni
+              # Partiamo dall'ultima riga e andiamo a ritroso
+              for i in range(1, entro_giorni + 1):
+                  # Indici per il controllo (oggi vs ieri relativo)
+                  idx_oggi = -i
+                  idx_ieri = -(i + 1)
+
+                  try:
+                      # Condizione Golden Cross:
+                      # Oggi la 50 è sopra la 200, ieri era sotto o uguale
+                      if (sma50.iloc[idx_oggi] > sma200.iloc[idx_oggi]) and \
+                          (sma50.iloc[idx_ieri] <= sma200.iloc[idx_ieri]):
+
+                          data_cross = df_tick.index[idx_oggi]
+                          giorni_fa = i - 1 # 0 se è successo oggi
+
+                          risultati.append({
+                              "Ticker": ticker,
+                              "Data Cross": data_cross.strftime('%Y-%m-%d'),
+                              "Giorni fa": giorni_fa,
+                              "Prezzo Attuale": df_tick['Close'].iloc[-1]
+                          })
+                          break # Trovato l'incrocio più recente per questo ticker, passa al prossimo
+                  except IndexError:
+                      continue
+
+      except Exception as e:
+          print(f"\nErrore nel blocco {idx_b}: {e}")
+          continue
+
+  print("\n[OK] Scansione completata.")
+  return pd.DataFrame(risultati)
 def ottieni_componenti_indice(indice="SP500"):
     """
     Scarica la lista ufficiale dei ticker.
