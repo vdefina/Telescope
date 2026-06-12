@@ -186,28 +186,23 @@ elif menu_navigazione == "🔥 Mean Reversion (Rimbalzi)":
                         date_segnali = ottieni_date_rimbalzo(df_ticker, data_inizio, data_fine)
 
                         # Call trova_giorni_ottimali and process its DataFrame output
-                        df_optimal_results = trova_giorni_ottimali(df_ticker, date_segnali, range_test=(3, 45))
+                        
+                        giorni_top, performance_top = trova_giorni_ottimali(df_ticker, date_segnali, range_test=(3, 45))
 
-                        giorni_top = 0
-                        performance_top = 0.0
-                        if not df_optimal_results.empty:
-                            miglior_riga = df_optimal_results.loc[df_optimal_results['media'].idxmax()]
-                            giorni_top = int(miglior_riga['giorni'])
-                            performance_top = miglior_riga['media']
-
-                        if giorni_top == 0:
-                            st.warning(f"⚠️ Nessun segnale di rimbalzo rilevato per {ticker_scelto} in queste date.")
-                        else:
-                            # Box metriche affiancate dal design pulito
+                        # Sostituiamo il controllo .empty con una verifica numerica
+                        if giorni_top > 0:
+                            # Creiamo i box grafici per mostrare i due numeri puliti
                             m1, m2 = st.columns(2)
                             with m1:
                                 with st.container(border=True):
                                     st.metric(label="Holding Period Ottimale", value=f"{giorni_top} Giorni di Borsa")
                             with m2:
                                 with st.container(border=True):
-                                    st.metric(label="Rendimento Medio Atteso per Trade", value=f"+ {performance_top:.2f} %")
+                                    st.metric(label="Rendimento Medio Atteso", value=f"+ {performance_top:.2f} %")
+                        else:
+                            st.warning("⚠️ Non è stato possibile calcolare un holding period ottimale per questo asset.")
 
-                            # Grafico Plotly con Template Dark coordinato
+                       # Grafico Plotly con Template Dark coordinato
                             fig = go.Figure()
                             fig.add_trace(go.Scatter(
                                 x=df_ticker.index, y=df_ticker['Close'],
