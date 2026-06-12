@@ -139,16 +139,21 @@ def ottieni_date_rimbalzo(df, start_date, end_date, cooling_off=10):
 
 def trova_giorni_ottimali(df, elenco_date, range_test=(3, 45)):
     """
-    Testa i giorni di holding e trova quello con la performance media migliore.
-    Previene il ZeroDivisionError se l'elenco dei rendimenti è vuoto.
+    Testa i giorni di holding e restituisce:
+    1. Il miglior giorno (int)
+    2. La miglior performance (float)
+    3. La tabella con TUTTI i risultati storici per il grafico (DataFrame)
     """
-    # 1. Protezione iniziale: se non ci sono proprio segnali in partenza
+    # Se non ci sono segnali, restituiamo valori a zero e una tabella vuota strutturata bene
     if not elenco_date or len(elenco_date) == 0:
-        return 0, 0.0
+        return 0, 0.0, pd.DataFrame(columns=['giorni', 'media'])
 
     miglior_giorno = 0
     miglior_performance = -999.0
     elenco_date = pd.to_datetime(elenco_date)
+    
+    # 🌟 Lista per raccogliere i dati di ogni singolo giorno per il grafico
+    storico_grafico = []
 
     for giorni in range(range_test[0], range_test[1] + 1):
         rendimenti = []
@@ -156,88 +161,36 @@ def trova_giorni_ottimali(df, elenco_date, range_test=(3, 45)):
         for data_segnale in elenco_date:
             try:
                 if data_segnale in df.index:
-                    # Trova la posizione numerica della riga della data
                     idx_inizio = df.index.get_loc(data_segnale)
                     idx_fine = idx_inizio + giorni
                     
-                    # Verifica che ci siano abbastanza giorni nel futuro per chiudere il trade
                     if idx_fine < len(df):
                         prezzo_ingresso = df['Close'].iloc[idx_inizio]
                         prezzo_uscita = df['Close'].iloc[idx_fine]
                         
-                        # Gestione robusta per evitare formati strani o valori nulli
                         if pd.notna(prezzo_ingresso) and pd.notna(prezzo_uscita) and prezzo_ingresso > 0:
                             rendimento = ((prezzo_uscita - prezzo_ingresso) / prezzo_ingresso) * 100
                             rendimenti.append(float(rendimento))
             except Exception:
-                continue # Salta silenziosamente eventuali anomalie su singole date
+                continue
         
-        # 🚨 LA MODIFICA CRUCIALE (Risolve il ZeroDivisionError):
-        # Calcoliamo la media SOLO se abbiamo registrato almeno un trade valido completato
         if len(rendimenti) > 0:
             media = sum(rendimenti) / len(rendimenti)
+            
+            # 🌟 Salviamo il risultato del giorno corrente nella lista per il grafico
+            storico_grafico.append({'giorni': giorni, 'media': media})
+            
             if media > miglior_performance:
                 miglior_performance = media
                 miglior_giorno = giorni
-        else:
-            # Se per questo specifico numero di giorni non ci sono trade completabili, salta al prossimo
-            continue
 
-    # Se alla fine del ciclo non è stato possibile completare nessun trade in nessun giorno
+    # 🌟 Trasformiamo la lista in un DataFrame perfetto per Plotly
+    df_optimal_results = pd.DataFrame(storico_grafico)
+
     if miglior_giorno == 0 or miglior_performance == -999.0:
-        return 0, 0.0
+        return 0, 0.0, df_optimal_results
 
-    return miglior_giorno, miglior_performance
-
-def verifica_segnale_data(ticker, data_target):
-  """
-  Verifica se nella data specificata si sono attivate
-  le condizioni di rimbalzo per il titolo inserito.
-  Format data richiesto: 'YYYY-MM-DD'
-  """
-  import datetime
-
-  target_dt = pd.to_datetime(data_target)
-
-  # 1. Calcoliamo un buffer di 90 giorni prima della data richiesta
-  # per permettere il calcolo corretto di indicatori, medie e volumi
-  inizio_buffer = (target_dt - datetime.timedelta(days=90)).strftime('%Y-%m-%d')
-  fine_analisi = (target_dt + datetime.timedelta(days=5)).strftime('%Y-%m-%d') # Un piccolo margine successivo
-
-  # 2. Scarichiamo lo storico mirato
-  df = carica_dati(ticker=ticker, start_date=inizio_buffer, end_date=fine_analisi)
-
-  if df is None or df.empty:
-      print(f"[{ticker}] Impossibile recuperare i dati per il periodo richiesto.")
-      return False
-
-  # 3. Gestione della data (cerca la più vicina se la borsa era chiusa)
-  if target_dt not in df.index:
-      idx_pos = df.index.get_indexer([target_dt], method='nearest')[0]
-      data_effettiva = df.index[idx_pos]
-      nota_data = f"(Data richiesta: {data_target} | Borsa chiusa -> Analizzata data disponibile più vicina: {data_effettiva.strftime('%Y-%m-%d')})"
-  else:
-      data_effettiva = target_dt
-      nota_data = f"(Data analizzata: {data_target})"
-
-  # 4. Troviamo la posizione numerica (indice iloc) della data effettiva
-  posizione_riga = df.index.get_loc(data_effettiva)
-
-  # 5. Eseguiamo il controllo con la tua funzione is_rimbalzo
-  segnale_attivo = is_rimbalzo(df, posizione_riga)
-
-  # 6. Output a schermo
-  print(f"\n--- Verifica Segnale per {ticker} ---")
-  print(nota_data)
-  print(f"Prezzo di Chiusura: ${df.iloc[posizione_riga]['Close']:.2f}")
-  print(f"RSI: {df.iloc[posizione_riga]['RSI']:.2f}")
-
-  if segnale_attivo:
-      print(f"🚨 SEGNALE ATTIVO! Il titolo soddisfaceva i criteri di rimbalzo in questa data.")
-  else:
-      print(f"❌ Nessun segnale rilevato per questa data.")
-
-  return segnale_attivo
+    return miglior_giorno, miglior_performance, df_optimal_results
 
 #Analisi trend rialzista
 def is_trend_rialzista(df, i):

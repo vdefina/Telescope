@@ -33,7 +33,7 @@ st.markdown("""
         .stElementContainer div[data-testid="stBlock"] {
             border-radius: 10px;
         }
-        /* Stile dei pulsanti principali */
+        /* Stile dei pulsanti principais */
         .stButton>button {
             width: 100%;
             background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
@@ -183,26 +183,23 @@ elif menu_navigazione == "🔥 Mean Reversion (Rimbalzi)":
                         if isinstance(df_ticker.columns, pd.MultiIndex):
                             df_ticker.columns = df_ticker.columns.droplevel(1)
 
+                        # Calcolo delle date di segnale
                         date_segnali = ottieni_date_rimbalzo(df_ticker, data_inizio, data_fine)
-
-                        # Call trova_giorni_ottimali and process its DataFrame output
                         
-                        giorni_top, performance_top = trova_giorni_ottimali(df_ticker, date_segnali, range_test=(3, 45))
+                        # Esecuzione del backtest di ottimizzazione (restituisce 3 elementi)
+                        giorni_top, performance_top, df_optimal_results = trova_giorni_ottimali(df_ticker, date_segnali, range_test=(3, 45))
 
-                        # Sostituiamo il controllo .empty con una verifica numerica
                         if giorni_top > 0:
-                            # Creiamo i box grafici per mostrare i due numeri puliti
+                            # Box metriche affiancate dal design pulito
                             m1, m2 = st.columns(2)
                             with m1:
                                 with st.container(border=True):
                                     st.metric(label="Holding Period Ottimale", value=f"{giorni_top} Giorni di Borsa")
                             with m2:
                                 with st.container(border=True):
-                                    st.metric(label="Rendimento Medio Atteso", value=f"+ {performance_top:.2f} %")
-                        else:
-                            st.warning("⚠️ Non è stato possibile calcolare un holding period ottimale per questo asset.")
+                                    st.metric(label="Rendimento Medio Atteso per Trade", value=f"+ {performance_top:.2f} %")
 
-                       # Grafico Plotly con Template Dark coordinato
+                            # Grafico 1: Andamento Prezzo e Segnali Buy
                             fig = go.Figure()
                             fig.add_trace(go.Scatter(
                                 x=df_ticker.index, y=df_ticker['Close'],
@@ -219,20 +216,22 @@ elif menu_navigazione == "🔥 Mean Reversion (Rimbalzi)":
 
                             fig.update_layout(
                                 title=f"Analisi Tecnica Segnali su {ticker_scelto}",
-                                template="plotly_dark",  # Sfondo scuro coordinato con l'app!
+                                template="plotly_dark",
                                 paper_bgcolor="#0d1117",
                                 plot_bgcolor="#0d1117",
                                 hovermode="x unified"
                             )
                             st.plotly_chart(fig, use_container_width=True)
 
-                            st.subheader("Performance Media per Periodo di Holding")
-                            # Bar chart for optimal results
+                            # Grafico 2: Istogramma delle performance per Holding Period
+                            st.subheader("📊 Performance Media per Periodo di Holding")
+                            
                             bar_fig = go.Figure(data=[go.Bar(
                                 x=df_optimal_results['giorni'],
                                 y=df_optimal_results['media'],
                                 marker_color=['#00f2fe' if g == giorni_top else '#4facfe' for g in df_optimal_results['giorni']]
                             )])
+                            
                             bar_fig.update_layout(
                                 title='Rendimento Medio per Giorni di Holding',
                                 xaxis_title='Giorni di Holding',
@@ -243,6 +242,8 @@ elif menu_navigazione == "🔥 Mean Reversion (Rimbalzi)":
                                 hovermode="x unified"
                             )
                             st.plotly_chart(bar_fig, use_container_width=True)
+                        else:
+                            st.warning("⚠️ Nessun segnale di rimbalzo completato rilevato in questa finestra temporale.")
 
 # =========================================================================
 # PAGINA 3: GOLDEN CROSS
