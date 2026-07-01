@@ -127,6 +127,17 @@ if menu_navigazione == "🏠 Home Dashboard":
             st.markdown("<h2 style='margin:10px 0;'>Incroci 50/200</h2>", unsafe_allow_html=True)
             st.caption("Trova le inversioni strutturali di trend di lungo periodo entro 3 giorni di borsa.")
 
+    st.markdown("<br><br>", unsafe_allow_html=True)
+
+    # Nuova riga per metriche aggiuntive
+    col_new_metric1, col_new_metric2, col_new_metric3 = st.columns(3)
+
+    with col_new_metric1:
+        with st.container(border=True):
+            st.markdown("<h4 style='color: #9333ea; margin:0;'>📊 Metrica Aggiuntiva</h4>", unsafe_allow_html=True)
+            st.markdown(f"<h2 style='margin:10px 0;'>Esempio Valore</h2>", unsafe_allow_html=True)
+            st.caption("Descrizione della metrica aggiuntiva.")
+
 # =========================================================================
 # PAGINA 2: STRATEGIA RIMBALZI
 # =========================================================================
