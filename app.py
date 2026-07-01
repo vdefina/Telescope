@@ -15,7 +15,7 @@ from funzioni import (
 
 # --- 1. CONFIGURAZIONE PAGINA (TEMA DARK & LAYOUT FLUIDO) ---
 st.set_page_config(
-    page_title="QuantLab Dashboard",
+    page_title="Telescope Dashboard",
     layout="wide",
     page_icon="⚡",
     initial_sidebar_state="expanded"
@@ -69,7 +69,7 @@ st.markdown("""
 
 # --- 3. BARRA LATERALE (NAVIGAZIONE APP-STYLE) ---
 with st.sidebar:
-    st.markdown("<h2 style='text-align: center; color: #4facfe;'>⚡ QuantLab v2.0</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; color: #4facfe;'>⚡ Telescope v2.0</h2>", unsafe_allow_html=True)
     st.markdown("---")
 
     # Menu di navigazione principale con icone
@@ -103,7 +103,7 @@ with st.sidebar:
 # PAGINA 1: HOME DASHBOARD
 # =========================================================================
 if menu_navigazione == "🏠 Home Dashboard":
-    st.markdown("<div class='main-title'>Benvenuto in QuantLab</div>", unsafe_allow_html=True)
+    st.markdown("<div class='main-title'>Benvenuto in Telescope</div>", unsafe_allow_html=True)
     st.write("La tua stazione di controllo quantitativa per il monitoraggio e lo screening dei mercati finanziari.")
 
     # Creazione di card riassuntive dello stato del mercato
