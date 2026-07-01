@@ -151,35 +151,35 @@ def trova_giorni_ottimali(df, elenco_date, range_test=(3, 45)):
     miglior_giorno = 0
     miglior_performance = -999.0
     elenco_date = pd.to_datetime(elenco_date)
-    
+
     # 🌟 Lista per raccogliere i dati di ogni singolo giorno per il grafico
     storico_grafico = []
 
     for giorni in range(range_test[0], range_test[1] + 1):
         rendimenti = []
-        
+
         for data_segnale in elenco_date:
             try:
                 if data_segnale in df.index:
                     idx_inizio = df.index.get_loc(data_segnale)
                     idx_fine = idx_inizio + giorni
-                    
+
                     if idx_fine < len(df):
                         prezzo_ingresso = df['Close'].iloc[idx_inizio]
                         prezzo_uscita = df['Close'].iloc[idx_fine]
-                        
+
                         if pd.notna(prezzo_ingresso) and pd.notna(prezzo_uscita) and prezzo_ingresso > 0:
                             rendimento = ((prezzo_uscita - prezzo_ingresso) / prezzo_ingresso) * 100
                             rendimenti.append(float(rendimento))
             except Exception:
                 continue
-        
+
         if len(rendimenti) > 0:
             media = sum(rendimenti) / len(rendimenti)
-            
+
             # 🌟 Salviamo il risultato del giorno corrente nella lista per il grafico
             storico_grafico.append({'giorni': giorni, 'media': media})
-            
+
             if media > miglior_performance:
                 miglior_performance = media
                 miglior_giorno = giorni

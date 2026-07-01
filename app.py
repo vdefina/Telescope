@@ -185,7 +185,7 @@ elif menu_navigazione == "🔥 Mean Reversion (Rimbalzi)":
 
                         # Calcolo delle date di segnale
                         date_segnali = ottieni_date_rimbalzo(df_ticker, data_inizio, data_fine)
-                        
+
                         # Esecuzione del backtest di ottimizzazione (restituisce 3 elementi)
                         giorni_top, performance_top, df_optimal_results = trova_giorni_ottimali(df_ticker, date_segnali, range_test=(3, 45))
 
@@ -225,13 +225,13 @@ elif menu_navigazione == "🔥 Mean Reversion (Rimbalzi)":
 
                             # Grafico 2: Istogramma delle performance per Holding Period
                             st.subheader("📊 Performance Media per Periodo di Holding")
-                            
+
                             bar_fig = go.Figure(data=[go.Bar(
                                 x=df_optimal_results['giorni'],
                                 y=df_optimal_results['media'],
                                 marker_color=['#00f2fe' if g == giorni_top else '#4facfe' for g in df_optimal_results['giorni']]
                             )])
-                            
+
                             bar_fig.update_layout(
                                 title='Rendimento Medio per Giorni di Holding',
                                 xaxis_title='Giorni di Holding',
